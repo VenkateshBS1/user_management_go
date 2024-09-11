@@ -25,6 +25,12 @@ var userCollection *mongo.Collection = database.OpenCollection(database.Client, 
 
 var validate = validator.New()
 
+type UserController struct{}
+
+func NewUserController() *UserController {
+	return &UserController{}
+}
+
 func HashPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
@@ -47,7 +53,7 @@ func VerifyPassword(userPassword string, providedPassword string) (bool, string)
 
 }
 
-func Signup() gin.HandlerFunc {
+func (uc *UserController) Signup() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		var user models.User
@@ -106,7 +112,7 @@ func Signup() gin.HandlerFunc {
 
 }
 
-func Login() gin.HandlerFunc {
+func (uc *UserController) Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		var user models.User
@@ -149,7 +155,7 @@ func Login() gin.HandlerFunc {
 	}
 }
 
-func GetUsers() gin.HandlerFunc {
+func (uc *UserController) GetUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -200,7 +206,7 @@ func GetUsers() gin.HandlerFunc {
 	}
 }
 
-func GetUser() gin.HandlerFunc {
+func (uc *UserController) GetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.Param(("user_id"))
 
@@ -224,4 +230,43 @@ func GetUser() gin.HandlerFunc {
 		c.JSON(http.StatusOK, user)
 	}
 
+}
+
+func (uc *UserController) Authenticate() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clientToken := c.Request.Header.Get("token")
+
+		if clientToken == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("NO Authentication header provided")})
+			c.Abort()
+			return
+
+		}
+
+		claims, err := helper.ValidateToken(clientToken)
+		if err != "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			c.Abort()
+			return
+		}
+		c.Set("email", claims.Email)
+		c.Set("first_name", claims.First_name)
+		c.Set("last_name", claims.Last_name)
+		c.Set("uid", claims.Uid)
+		c.Set("user_type", claims.User_type)
+		c.Next()
+
+	}
+}
+
+func (uc *UserController) AuthRoutes(incomingRoutes *gin.Engine) {
+	incomingRoutes.POST("users/signup", uc.Signup())
+	incomingRoutes.POST("users/login", uc.Login())
+
+}
+
+func (uc *UserController) UserRoutes(incomingRoutes *gin.Engine) {
+	incomingRoutes.Use(uc.Authenticate())
+	incomingRoutes.GET("/users", uc.GetUsers())
+	incomingRoutes.GET("/users/:user_id", uc.GetUser())
 }

@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	routes "github.com/venkateshBS1/golang_user_management_jwt/routes"
+	controller "github.com/venkateshBS1/golang_user_management_jwt/controllers"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,14 +21,14 @@ func main() {
 	port := os.Getenv("PORT")
 
 	if port == "" {
-		port = "8000"
+		port = "9000"
 	}
 
 	router := gin.New()
 	router.Use(gin.Logger())
 
-	routes.AuthRoutes(router)
-	routes.UserRoutes(router)
+	controller.NewUserController().AuthRoutes(router)
+	controller.NewUserController().UserRoutes(router)
 
 	router.GET("/api-1", func(c *gin.Context) {
 		c.JSON(200, gin.H{"Success": "Access granted for api-1"})
